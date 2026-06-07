@@ -1,32 +1,13 @@
 import streamlit as st
 import requests
 import os
-import random
 from dotenv import load_dotenv
 import chromadb
 from sentence_transformers import SentenceTransformer
 from groq import Groq
-import plotly.express as px
-import pandas as pd
-from database import init_db, save_flight, get_price_history, get_prices_by_day, get_avg_price
+from database import init_db
 
 load_dotenv()
-
-base_prices = {
-    ("COK", "DEL"): 4000, ("BLR", "DEL"): 4500,
-    ("BOM", "DEL"): 3500, ("MAA", "DEL"): 5000,
-    ("COK", "BOM"): 3000, ("BLR", "HKG"): 18000,
-    ("COK", "DXB"): 8000, ("BLR", "SIN"): 12000,
-    ("DEL", "LHR"): 45000, ("BOM", "JFK"): 55000,
-    ("COK", "SIN"): 11000, ("COK", "KUL"): 9000,
-    ("DEL", "DXB"): 12000, ("BOM", "DXB"): 10000,
-    ("DEL", "SIN"): 15000, ("MAA", "SIN"): 13000,
-    ("DEL", "NRT"): 40000, ("BOM", "LHR"): 50000,
-    ("DEL", "JFK"): 60000, ("BLR", "DXB"): 11000,
-    ("HYD", "DEL"): 4000, ("CCU", "DEL"): 3500,
-    ("GOI", "BOM"): 3000, ("COK", "DOH"): 9000,
-    ("DEL", "BKK"): 18000, ("BOM", "BKK"): 16000,
-}
 
 airports = {
     "Kochi (COK)": "COK",
@@ -66,11 +47,6 @@ airports = {
     "Bahrain (BAH)": "BAH",
     "Kuwait (KWI)": "KWI",
 }
-
-def get_price(departure, arrival):
-    base = base_prices.get((departure, arrival),
-           base_prices.get((arrival, departure), 10000))
-    return round(random.uniform(base * 0.9, base * 1.2))
 
 def get_weather(city):
     api_key = os.getenv("OPENWEATHER_API_KEY")
@@ -192,13 +168,6 @@ def add_style():
         line-height: 1.8;
     }
 
-    .card .price {
-        color: #76b900 !important;
-        font-weight: 700;
-        font-size: 20px;
-        margin-top: 8px !important;
-    }
-
     .card .label {
         color: #555555 !important;
         font-size: 12px;
@@ -217,22 +186,6 @@ def add_style():
 
     .card-success p {
         color: #2a4a00 !important;
-        margin: 0;
-        font-weight: 600;
-        font-size: 14px;
-    }
-
-    .card-warning {
-        background: #fff8e6;
-        border: 1px solid #ffd980;
-        border-left: 4px solid #ffaa00;
-        border-radius: 6px;
-        padding: 14px 18px;
-        margin-bottom: 10px;
-    }
-
-    .card-warning p {
-        color: #7a4a00 !important;
         margin: 0;
         font-weight: 600;
         font-size: 14px;
@@ -301,23 +254,6 @@ def add_style():
         color: #111111 !important;
     }
 
-    div[data-testid="stInfo"],
-    div[data-testid="stSuccess"],
-    div[data-testid="stWarning"],
-    div[data-testid="stAlert"] {
-        background: #f7f7f7 !important;
-        border: 1px solid #e4e4e4 !important;
-        border-left: 4px solid #76b900 !important;
-        border-radius: 6px !important;
-        color: #111111 !important;
-        padding: 14px 18px !important;
-    }
-
-    div[data-testid="stWarning"] {
-        border-left: 4px solid #ffaa00 !important;
-        background: #fff8e6 !important;
-    }
-
     section[data-testid="stSidebar"] {
         background: #000000 !important;
         border-right: 3px solid #76b900 !important;
@@ -366,7 +302,7 @@ if page == "Flight Search":
         </div>
         <div class='logo-bar'></div>
     </div>
-    <p class='tagline'>AI-powered flight search — real-time data, smart analytics, instant answers</p>
+    <p class='tagline'>AI-powered flight search — real-time data, smart recommendations, instant answers</p>
     """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
@@ -380,7 +316,7 @@ if page == "Flight Search":
         arrival = airports[arrival_city]
 
     st.markdown("<div class='section-label'>Ask anything</div>", unsafe_allow_html=True)
-    question = st.text_input("", placeholder="e.g. Which flights are cheapest this weekend?", key="question")
+    question = st.text_input("", placeholder="e.g. Which flights are available today?", key="question")
 
     search = st.button("Search Flights", key="search_btn")
 
@@ -399,22 +335,11 @@ if page == "Flight Search":
 
             flight_texts = []
             flight_ids = []
-            flight_prices = []
 
             for i, flight in enumerate(data["data"]):
-                price = get_price(departure, arrival)
-                flight_prices.append(price)
-                text = f"Flight {flight['flight']['iata']} from {departure} to {arrival}. Departure: {flight['departure']['scheduled']}. Arrival: {flight['arrival']['scheduled']}. Status: {flight['flight_status']}. Airline: {flight['airline']['name']}. Estimated Price: Rs{price}."
+                text = f"Flight {flight['flight']['iata']} from {departure} to {arrival}. Departure: {flight['departure']['scheduled']}. Arrival: {flight['arrival']['scheduled']}. Status: {flight['flight_status']}. Airline: {flight['airline']['name']}."
                 flight_texts.append(text)
                 flight_ids.append(f"flight_{i}")
-                save_flight(
-                    flight["flight"]["iata"],
-                    departure,
-                    arrival,
-                    price,
-                    flight["airline"]["name"],
-                    flight["flight_status"]
-                )
 
             model = SentenceTransformer("all-MiniLM-L6-v2")
             embeddings = model.encode(flight_texts).tolist()
@@ -469,7 +394,7 @@ Give a clear, helpful answer."""
                 <div class='card'>
                     <p><strong>{flight['flight']['iata']}</strong> &nbsp;&nbsp; {flight['airline']['name']}</p>
                     <p class='label'>{departure} → {arrival} &nbsp;|&nbsp; Departs {dep_time} &nbsp;|&nbsp; Arrives {arr_time} &nbsp;|&nbsp; {flight['flight_status'].upper()}</p>
-                    <p class='price'>Rs {flight_prices[i]:,}</p>
+                    <p style='color:#76b900;font-size:11px;margin-top:6px;font-weight:600'>Check airline website for latest prices</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -481,65 +406,6 @@ Give a clear, helpful answer."""
             st.markdown("<hr class='divider'>", unsafe_allow_html=True)
             st.markdown("<div class='section-title'>Weather at Destination</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='card'><p>{weather}</p></div>", unsafe_allow_html=True)
-
-            st.markdown("<hr class='divider'>", unsafe_allow_html=True)
-            st.markdown("<div class='section-title'>Price Prediction</div>", unsafe_allow_html=True)
-            avg_price = get_avg_price(departure, arrival)
-            current_price = get_price(departure, arrival)
-            if avg_price:
-                if current_price < avg_price:
-                    st.markdown(f"<div class='card-success'><p>Good time to book — Current Rs {current_price:,} is below the 30-day average of Rs {round(avg_price):,}</p></div>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<div class='card-warning'><p>Prices are above average — Current Rs {current_price:,} vs average Rs {round(avg_price):,}. Consider waiting.</p></div>", unsafe_allow_html=True)
-            else:
-                st.markdown("<div class='card'><p>Not enough data for prediction yet. Search more routes to build history.</p></div>", unsafe_allow_html=True)
-
-            st.markdown("<hr class='divider'>", unsafe_allow_html=True)
-            st.markdown("<div class='section-title'>Best Day to Fly</div>", unsafe_allow_html=True)
-            day_data = get_prices_by_day(departure, arrival)
-            if day_data:
-                days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-                df_days = pd.DataFrame(day_data, columns=["Day", "Avg Price (Rs)"])
-                df_days["Day"] = df_days["Day"].apply(lambda x: days[int(x)])
-                fig2 = px.bar(df_days, x="Day", y="Avg Price (Rs)",
-                              color="Avg Price (Rs)",
-                              color_continuous_scale="RdYlGn_r",
-                              template="plotly_white")
-                fig2.update_layout(
-                    font_family="Inter",
-                    font_color="#000000",
-                    title_text="",
-                    plot_bgcolor="#ffffff",
-                    paper_bgcolor="#ffffff",
-                    margin=dict(l=0, r=0, t=10, b=0),
-                    yaxis=dict(gridcolor="#000000", color="#000000", linecolor="#000000", tickfont=dict(color="#000000")),
-                    xaxis=dict(gridcolor="#000000", color="#000000", linecolor="#000000", tickfont=dict(color="#000000"))
-                )
-                st.plotly_chart(fig2, use_container_width=True)
-            else:
-                st.markdown("<div class='card'><p>Search more times to build heatmap data.</p></div>", unsafe_allow_html=True)
-
-            st.markdown("<hr class='divider'>", unsafe_allow_html=True)
-            st.markdown("<div class='section-title'>Price Trend</div>", unsafe_allow_html=True)
-            history = get_price_history(departure, arrival)
-            if history:
-                df = pd.DataFrame(history, columns=["Date", "Avg Price (Rs)"])
-                fig = px.line(df, x="Date", y="Avg Price (Rs)", template="plotly_white")
-                fig.update_xaxes(tickformat="%b %d")
-                fig.update_traces(line_color="#76b900", line_width=3)
-                fig.update_layout(
-                    font_family="Inter",
-                    font_color="#000000",
-                    title_text="",
-                    plot_bgcolor="#ffffff",
-                    paper_bgcolor="#ffffff",
-                    margin=dict(l=0, r=0, t=10, b=0),
-                    yaxis=dict(gridcolor="#000000", color="#000000", linecolor="#000000", tickfont=dict(color="#000000")),
-                    xaxis=dict(gridcolor="#000000", color="#000000", linecolor="#000000", tickfont=dict(color="#000000"))
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.markdown("<div class='card'><p>Search more times to build price history.</p></div>", unsafe_allow_html=True)
 
             st.markdown("<hr class='divider'>", unsafe_allow_html=True)
             st.markdown("<div class='section-title'>Destination Guide</div>", unsafe_allow_html=True)
@@ -556,7 +422,7 @@ elif page == "Group Planner":
         </div>
         <div class='logo-bar'></div>
     </div>
-    <p class='tagline'>Find the cheapest flights for your entire group in one click</p>
+    <p class='tagline'>Find the best flights for your entire group in one click</p>
     """, unsafe_allow_html=True)
 
     st.markdown("<div class='section-label'>Where is everyone going?</div>", unsafe_allow_html=True)
@@ -574,39 +440,26 @@ elif page == "Group Planner":
             person_city = st.selectbox("", list(airports.keys()), key=f"person_{i}")
             origins.append((person_city, airports[person_city]))
 
-    if st.button("Find Cheapest Group Flights", key="group_btn"):
+    if st.button("Find Group Flights", key="group_btn"):
         st.markdown("<hr class='divider'>", unsafe_allow_html=True)
         st.markdown("<div class='section-title'>Group Flight Summary</div>", unsafe_allow_html=True)
 
-        total_cost = 0
-        results_list = []
-
         cols2 = st.columns(2)
         for idx, (person_city, person_iata) in enumerate(origins):
-            price = get_price(person_iata, destination)
-            total_cost += price
-            results_list.append((person_city, destination_city, price))
             with cols2[idx % 2]:
                 st.markdown(f"""
                 <div class='card'>
                     <p class='label'>Person {idx+1}</p>
                     <p><strong>{person_city} → {destination_city}</strong></p>
-                    <p class='price'>Rs {price:,}</p>
+                    <p style='color:#76b900;font-size:11px;margin-top:6px;font-weight:600'>Check airline website for latest prices</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-        avg_per_person = round(total_cost / num_people)
-        cheapest = min(results_list, key=lambda x: x[2])
-
-        st.markdown(f"<div class='card-success'><p>Total group cost: Rs {total_cost:,} &nbsp;|&nbsp; Average per person: Rs {avg_per_person:,}</p></div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='card-success'><p>Cheapest route: {cheapest[0]} to {cheapest[1]} at Rs {cheapest[2]:,}</p></div>", unsafe_allow_html=True)
-
         groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        summary = "\n".join([f"Person from {r[0]}: Rs{r[2]}" for r in results_list])
+        origins_text = "\n".join([f"Person {i+1} from {o[0]}" for i, o in enumerate(origins)])
         prompt = f"""A group of {num_people} people are traveling to {destination_city}.
-Flights and costs: {summary}
-Total: Rs{total_cost}, Average: Rs{avg_per_person}
-Give a short helpful travel tip."""
+Origins: {origins_text}
+Give a short helpful travel tip for this group."""
 
         response = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
