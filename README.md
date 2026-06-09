@@ -2,6 +2,8 @@
 
 > AI-powered travel assistant built with RAG (Retrieval-Augmented Generation) — real-time flight data, smart analytics, and intelligent recommendations.
 
+🌐 **Live Demo:** [https://travelmind-al7hb5fqrtcbbwzm8rlqgj.streamlit.app/](https://travelmind-al7hb5fqrtcbbwzm8rlqgj.streamlit.app/)
+
 ![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.x-red?style=flat-square)
 ![LangChain](https://img.shields.io/badge/LangChain-RAG-green?style=flat-square)
@@ -156,27 +158,3 @@ This means the AI never makes up flight information — it only answers based on
 ## Disclaimer
 
 Price analytics use estimated fares based on typical route patterns for demonstration purposes. For actual booking prices, please check airline websites directly.
-
----
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
