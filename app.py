@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import os
 import random
-from dotenv import load_dotenv
 import chromadb
 from sentence_transformers import SentenceTransformer
 from groq import Groq
@@ -10,7 +9,6 @@ import plotly.express as px
 import pandas as pd
 from database import init_db, save_flight, get_price_history, get_prices_by_day, get_avg_price
 
-load_dotenv()
 
 base_prices = {
     ("COK", "DEL"): 4000, ("BLR", "DEL"): 4500,
